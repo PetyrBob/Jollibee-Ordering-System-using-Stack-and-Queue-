@@ -23,16 +23,16 @@ private slots:
     void startQueue();
     void serveOrder();
     void deleteOrder();
-    void updateCompletedOrdersCount();  // New method to update order count
+    void updateCompletedOrdersCount();  
     void updatePendingOrdersCount();
 
 private:
     Ui::MainWindow *ui;
     QTimer *timer;
-    int timerDuration; // Duration of the timer in seconds
-    int timeLeft;      // Time left in seconds
+    int timerDuration; 
+    int timeLeft;      
 
     void updateLCD(int timeInSeconds);
 };
 
-#endif // MAINWINDOW_H
+#endif 
