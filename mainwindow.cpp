@@ -3,34 +3,37 @@
 #include <QTimer>
 #include <QTime>
 #include <QIcon>
+#include <QStack>
+#include <QQueue>
 
 MainWindow::MainWindow(QWidget *parent)
-    : QMainWindow(parent)
-    , ui(new Ui::MainWindow)
+    : QMainWindow(parent), ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-
 
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::updateTimer);
     timerDuration = 3 * 60;  
     timeLeft = timerDuration;
 
-  
-    ui->lcdNumber->setDigitCount(5); 
+    ui->lcdNumber->setDigitCount(5);
     updateLCD(timeLeft);
 
-   
-    connect(ui->Order, &QPushButton::clicked, this, &MainWindow::addOrder);
+    connect(ui->Order, &QPushButton::clicked, this, &MainWindow::enqueueOrder);
     connect(ui->Queue, &QPushButton::clicked, this, &MainWindow::startQueue);
-    connect(ui->Serve, &QPushButton::clicked, this, &MainWindow::serveOrder);
+    connect(ui->Serve, &QPushButton::clicked, this, &MainWindow::dequeueOrder);
     connect(ui->Delete, &QPushButton::clicked, this, &MainWindow::deleteOrder);
     connect(ui->RecentOrders, &QPushButton::clicked, this, &MainWindow::updatePendingOrdersCount);
+
+    orderQueue = new QQueue<QString>();
+    orderStack = new QStack<QString>();
 }
 
 MainWindow::~MainWindow()
 {
     delete ui;
+    delete orderQueue;
+    delete orderStack;
 }
 
 void MainWindow::updateLCD(int timeInSeconds)
@@ -48,63 +51,44 @@ void MainWindow::updateTimer()
         updateLCD(timeLeft);
     } else {
         timer->stop();
-        
-        if (ui->pending_orders->count() > 0) {
-            QListWidgetItem* item = ui->pending_orders->takeItem(0);
-            ui->completed_orders->addItem(item);
-            
+        if (!orderQueue->isEmpty()) {
+            QString order = orderQueue->dequeue();
+            ui->completed_orders->addItem(order);
             updateCompletedOrdersCount();
-          
+
             timeLeft = timerDuration;
             updateLCD(timeLeft);
-          
-            if (ui->pending_orders->count() > 0) {
+
+            if (!orderQueue->isEmpty()) {
                 timer->start(1000);
             }
         }
     }
 }
 
-void MainWindow::addOrder()
+void MainWindow::enqueueOrder()
 {
     QString orderText = ui->lineEdit->text();
     if (!orderText.isEmpty()) {
-      
-        QString orderNumber = QString::asprintf("#%03d", ui->pending_orders->count() + 1);
-
-
+        QString orderNumber = QString::asprintf("#%03d", orderQueue->size() + 1);
         QString orderWithNumber = orderNumber + ": " + orderText;
-
-       
+        orderQueue->enqueue(orderWithNumber);
         ui->pending_orders->addItem(orderWithNumber);
-
-       
         ui->lineEdit->clear();
     }
 }
 
-void MainWindow::startQueue()
+void MainWindow::dequeueOrder()
 {
-    if (!timer->isActive() && ui->pending_orders->count() > 0) {
-        timeLeft = timerDuration;  
-        updateLCD(timeLeft);
-        timer->start(1000); 
-    }
-}
-
-void MainWindow::serveOrder()
-{
-   
-    if (ui->pending_orders->count() > 0) {
-        QListWidgetItem* item = ui->pending_orders->takeItem(0);
-        ui->completed_orders->addItem(item);
-        
+    if (!orderQueue->isEmpty()) {
+        QString order = orderQueue->dequeue();
+        ui->completed_orders->addItem(order);
         updateCompletedOrdersCount();
-        
+
         timeLeft = timerDuration;
         updateLCD(timeLeft);
-       
-        if (ui->pending_orders->count() > 0) {
+
+        if (!orderQueue->isEmpty()) {
             timer->start(1000);
         } else {
             timer->stop();
@@ -112,22 +96,39 @@ void MainWindow::serveOrder()
     }
 }
 
+void MainWindow::pushOrderToStack()
+{
+    QString orderText = ui->lineEdit->text();
+    if (!orderText.isEmpty()) {
+        orderStack->push(orderText);
+        ui->pending_orders->addItem("Stack Order: " + orderText);
+        ui->lineEdit->clear();
+    }
+}
+
+void MainWindow::popOrderFromStack()
+{
+    if (!orderStack->isEmpty()) {
+        QString order = orderStack->pop();
+        ui->completed_orders->addItem("Completed Stack Order: " + order);
+        updateCompletedOrdersCount();
+    }
+}
+
 void MainWindow::deleteOrder()
 {
-   
     QListWidgetItem* item = ui->pending_orders->currentItem();
     if (item) {
         delete item;
     }
 }
 
-
 void MainWindow::updateCompletedOrdersCount()
 {
     int completedOrderCount = ui->completed_orders->count();
     QString countText = QString("Completed Orders: %1").arg(completedOrderCount);
     ui->completed_orders_2->clear();
-    ui->completed_orders_2->addItem(countText); 
+    ui->completed_orders_2->addItem(countText);
 }
 
 void MainWindow::updatePendingOrdersCount()
@@ -135,7 +136,5 @@ void MainWindow::updatePendingOrdersCount()
     int pendingOrderCount = ui->pending_orders->count();
     QString countText = QString("Pending Orders: %1").arg(pendingOrderCount);
     ui->completed_orders_3->clear();
-    ui->completed_orders_3->addItem(countText);  
+    ui->completed_orders_3->addItem(countText);
 }
-
-
